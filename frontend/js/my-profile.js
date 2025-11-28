@@ -196,91 +196,111 @@ function setupPhotoActions() {
 }
 
 // === DIRECCIONES DE ENVÍO ===
-function getAddresses() {
-  return readLS(ADDRESSES_KEY, []);
+async function getAddressesData() {
+  try {
+    return await getAddresses(); // del api.js
+  } catch (error) {
+    console.error('Error obteniendo direcciones:', error);
+    // Fallback a localStorage si falla
+    return readLS(ADDRESSES_KEY, []);
+  }
 }
 
 // Guarda todas las direcciones en localStorage
-function saveAddresses(addresses) {
-  writeLS(ADDRESSES_KEY, addresses);
+async function saveNewAddressToBackend(addressData) {
+  try {
+    const newAddress = await createAddress(addressData);
+    return newAddress;
+  } catch (error) {
+    console.error('Error guardando dirección:', error);
+    throw error;
+  }
 }
 
 // Renderiza las direcciones en el DOM
-function renderAddresses() {
+async function renderAddresses() {
   const container = document.getElementById('addressesList');
   if (!container) return;
 
-  const addresses = getAddresses();
+  try {
+    const addresses = await getAddressesData();
 
-  if (addresses.length === 0) {
+    if (addresses.length === 0) {
+      container.innerHTML = `
+        <div class="no-addresses">
+          <i class="bi bi-geo-alt"></i>
+          <h3>No tienes direcciones guardadas</h3>
+          <p>Agrega una dirección para facilitar tus compras futuras</p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = addresses
+      .map(
+        (addr) => `
+      <div class="address-card ${addr.isDefault ? 'default' : ''}" data-id="${addr.id}">
+        <div class="address-card-header">
+          <div class="address-title">
+            <h3>${addr.alias}</h3>
+            ${
+              addr.isDefault
+                ? '<span class="badge-default"><i class="bi bi-star-fill"></i> Predeterminada</span>'
+                : ''
+            }
+          </div>
+          <div class="address-actions">
+            ${
+              !addr.isDefault
+                ? `<button class="btn-address-action" onclick="setDefaultAddress('${addr.id}')" 
+                    title="Establecer como predeterminada">
+                    <i class="bi bi-star"></i>
+                  </button>`
+                : ''
+            }
+            <button class="btn-address-action" onclick="editAddress('${addr.id}')" title="Editar">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn-address-action danger" onclick="deleteAddress('${
+              addr.id
+            }')" title="Eliminar">
+              <i class="bi bi-trash"></i>
+            </button>
+          </div>
+        </div>
+        <div class="address-details">
+          <p><strong>${addr.street}</strong>${addr.corner ? ` esquina ${addr.corner}` : ''}${
+          addr.apartment ? `, ${addr.apartment}` : ''
+        }</p>
+          <p>${addr.city}, ${addr.state} ${addr.zipCode}</p>
+          <p>${addr.country}</p>
+          ${
+            addr.phone
+              ? `<div class="address-phone">
+              <i class="bi bi-telephone"></i>
+              <span>${addr.phone}</span>
+            </div>`
+              : ''
+          }
+          ${
+            addr.instructions
+              ? `<div class="address-instructions">
+              <i class="bi bi-info-circle"></i> ${addr.instructions}
+            </div>`
+              : ''
+          }
+        </div>
+      </div>
+    `
+      )
+      .join('');
+  } catch (error) {
     container.innerHTML = `
-      <div class="no-addresses">
-        <i class="bi bi-geo-alt"></i>
-        <h3>No tienes direcciones guardadas</h3>
-        <p>Agrega una dirección para facilitar tus compras futuras</p>
+      <div class="error-state">
+        <p>Error cargando direcciones. Por favor intenta de nuevo.</p>
       </div>
     `;
-    return;
   }
-
-  container.innerHTML = addresses
-    .map(
-      (addr) => `
-    <div class="address-card ${addr.isDefault ? 'default' : ''}" data-id="${addr.id}">
-      <div class="address-card-header">
-        <div class="address-title">
-          <h3>${addr.alias}</h3>
-          ${
-            addr.isDefault
-              ? '<span class="badge-default"><i class="bi bi-star-fill"></i> Predeterminada</span>'
-              : ''
-          }
-        </div>
-        <div class="address-actions">
-          ${
-            !addr.isDefault
-              ? `<button class="btn-address-action" onclick="setDefaultAddress('${addr.id}')" 
-                   title="Establecer como predeterminada">
-                   <i class="bi bi-star"></i>
-                 </button>`
-              : ''
-          }
-          <button class="btn-address-action" onclick="editAddress('${addr.id}')" title="Editar">
-            <i class="bi bi-pencil"></i>
-          </button>
-          <button class="btn-address-action danger" onclick="deleteAddress('${
-            addr.id
-          }')" title="Eliminar">
-            <i class="bi bi-trash"></i>
-          </button>
-        </div>
-      </div>
-      <div class="address-details">
-        <p><strong>${addr.street}</strong>${addr.corner ? ` esquina ${addr.corner}` : ''}${
-        addr.apartment ? `, ${addr.apartment}` : ''
-      }</p>
-        <p>${addr.city}, ${addr.state} ${addr.zipCode}</p>
-        <p>${addr.country}</p>
-        ${
-          addr.phone
-            ? `<div class="address-phone">
-             <i class="bi bi-telephone"></i>
-             <span>${addr.phone}</span>
-           </div>`
-            : ''
-        }
-        ${
-          addr.instructions
-            ? `<div class="address-instructions">
-             <i class="bi bi-info-circle"></i> ${addr.instructions}
-           </div>`
-            : ''
-        }
-      </div>
-    </div>
-  `
-    )
-    .join('');
 }
 
 // Abre el modal para agregar/editar dirección
